@@ -11,7 +11,7 @@
             "request": "launch",
             //${workspaceRoot}/
             //"program": "/${fileDirname}/${fileBasenameNoExtension}.out",
-            "program": "/home/tx2/Desktop/rm/002.robotMaster/bin/${fileBasenameNoExtension}.out",
+            "program": "/home/tx2/Desktop/-Climber-/bin/${fileBasenameNoExtension}.out",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
