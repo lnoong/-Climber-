@@ -408,93 +408,58 @@ void Solution::adjustAngle(const cv::Mat & pos_in_ptz, double & angle_x, double 
 	//cout << "angle_x=  " << 90-angle_x<< "angle_y=  " << 90-angle_y<< endl;
 }
 
-// /**
-// PNP解算.
-// *@copyright 2023-2024，Climber
-// *@name pnpProcess
-// *@param pos_in_ptz 输入位姿
-// *@param angle_x 输出-目标x偏角
-// *@param angle_y 输出-目标y偏角
-// *@param bullet_speed 输入-子弹速度
-// *@param current_ptz_angle 输入-当前偏角
-// *@author 郑龙
-// *@version 2023.2.15.01
-// *@date 2023.2.27
-// */
-// void Solution::pnpProcess()
-// {
-// std::vector<Point2f> P;//图像上的点
-// 		P.clear();
-// 		P.push_back((Point2f)Light_Contour[light[reliability[index][0]].i][0]);
-// 		P.push_back((Point2f)Light_Contour[light[reliability[index][1]].i][0]);
-// 		P.push_back((Point2f)light[reliability[index][0]].Rect.center);
-// 		P.push_back((Point2f)light[reliability[index][1]].Rect.center);
+/**
+PNP解算.
+*@copyright 2023-2024，Climber
+*@name pnpProcess
+*@param p 图像上的点
+*@param objP 实际物体上的点
+*@param cameraMatrix 相机内参
+*@param distCoeffs 相机外参
+*@param current_ptz_angle 输入-当前偏角
+*@author 郑龙
+*@version 2023.2.15.01
+*@date 2023.2.27
+*/
+void Solution::pnpProcess(vector<Point2f> P,vector<Point3f> objP,Mat cameraMatrix,Mat distCoeffs)
+{
 
-// 		//将控制点在世界坐标系的坐标压入容器
-// 		std::vector<cv::Point3f> objP;
-// 		objP.clear();
-// 		objP.push_back(cv::Point3f(-7.5, 3.0, 0));
-// 		objP.push_back(cv::Point3f(7.5, 3.0, 0));
-// 		objP.push_back(cv::Point3f(-7.5, 0, 0));
-// 		objP.push_back(cv::Point3f(7.5, 0, 0));
+		//创建旋转矩阵和平移矩阵
+		Mat rvecs ;
+		Mat tvecs ;
 
-// 		//创建旋转矩阵和平移矩阵
-// 		Mat rvecs ;
-// 		Mat tvecs ;
+		//求解pnp
+		static Mat lasttvecs = Mat::zeros(Size(1, 3), CV_64F);
+		solvePnP(objP, P, cameraMatrix, distCoeffs, rvecs, tvecs);
+		Mat rotM = Mat::eye(3, 3, CV_64F);
+		Mat rotT = Mat::eye(3, 3, CV_64F);
+		Rodrigues(rvecs, rotM);  //将旋转向量变换成旋转矩阵
+		Rodrigues(tvecs, rotT);
 
-// 		//相机内参矩阵与外参矩阵(需要标定)
-// 		Mat cameraMatrix = Mat::eye(3, 3, CV_64F);//单位矩阵函数
-// 		cameraMatrix.at<double>(0, 0) = 3636.201;
-// 		cameraMatrix.at<double>(0, 1) = 0;
-// 		cameraMatrix.at<double>(0, 2) = 744.9806;
-// 		cameraMatrix.at<double>(1, 0) = 0;
-// 		cameraMatrix.at<double>(1, 1) =3642.7002;
-// 		cameraMatrix.at<double>(1, 2) = 574.7465;
-// 		cameraMatrix.at<double>(2, 0) = 0;
-// 		cameraMatrix.at<double>(2, 1) = 0;
-// 		cameraMatrix.at<double>(2, 2) = 1;
+		// //计算相机旋转角
+		// double theta_x, theta_y, theta_z;
+		// double PI = 3.14159;
+		// theta_x = atan2(rotM.at<double>(2, 1), rotM.at<double>(2, 2));
+		// theta_y = atan2(-rotM.at<double>(2, 0),
+		// 	sqrt(rotM.at<double>(2, 1) * rotM.at<double>(2, 1) + rotM.at<double>(2, 2) * rotM.at<double>(2, 2)));
+		// theta_z = atan2(rotM.at<double>(1, 0), rotM.at<double>(0, 0));
+		// theta_x = theta_x * (180 / PI);
+		// theta_y = theta_y * (180 / PI);
+		// theta_z = theta_z * (180 / PI);
 
-// 		Mat distCoeffs = Mat::zeros(5, 1, CV_64F);
-// 		distCoeffs.at<double>(0, 0) = -0.0681;
-// 		distCoeffs.at<double>(1, 0) = 0.4122;
-// 		distCoeffs.at<double>(2, 0) = 0;
-// 		distCoeffs.at<double>(3, 0) = 0;
-// 		distCoeffs.at<double>(4, 0) = 0;
-// 		//求解pnp
-// 		static Mat lasttvecs = Mat::zeros(Size(1, 3), CV_64F);
-// 		solvePnP(objP, P, cameraMatrix, distCoeffs, rvecs, tvecs);
-// 		Mat rotM = Mat::eye(3, 3, CV_64F);
-// 		Mat rotT = Mat::eye(3, 3, CV_64F);
-// 		Rodrigues(rvecs, rotM);  //将旋转向量变换成旋转矩阵
-// 		Rodrigues(tvecs, rotT);
+		//计算角度
+		Mat adjustTvecs;
+		Mat rot_camera2ptz = cv::Mat::eye(3, 3, CV_64FC1);
+		Mat trans_camera2ptz = cv::Mat::zeros(3, 1, CV_64FC1);
+		adjustTvecs = rot_camera2ptz * tvecs - trans_camera2ptz;
+		adjustAngle(adjustTvecs,angle_x,angle_y,1,0);
 
-// 		// //计算相机旋转角
-// 		// double theta_x, theta_y, theta_z;
-// 		// double PI = 3.14159;
-// 		// theta_x = atan2(rotM.at<double>(2, 1), rotM.at<double>(2, 2));
-// 		// theta_y = atan2(-rotM.at<double>(2, 0),
-// 		// 	sqrt(rotM.at<double>(2, 1) * rotM.at<double>(2, 1) + rotM.at<double>(2, 2) * rotM.at<double>(2, 2)));
-// 		// theta_z = atan2(rotM.at<double>(1, 0), rotM.at<double>(0, 0));
-// 		// theta_x = theta_x * (180 / PI);
-// 		// theta_y = theta_y * (180 / PI);
-// 		// theta_z = theta_z * (180 / PI);
+		//计算深度
+		Mat distance=Mat::zeros(Size(3,3), CV_64F);
+		distance = rotM.t() * tvecs;
 
-// 		//计算角度
-// 		Mat adjustTvecs;
-// 		Mat rot_camera2ptz = cv::Mat::eye(3, 3, CV_64FC1);
-// 		Mat trans_camera2ptz = cv::Mat::zeros(3, 1, CV_64FC1);
-// 		adjustTvecs = rot_camera2ptz * tvecs - trans_camera2ptz;
-// 		adjustAngle(adjustTvecs,angle_x,angle_y,1,0);
-
-// 		//计算深度
-// 		Mat distance=Mat::zeros(Size(3,3), CV_64F);
-// 		distance = rotM.t() * tvecs;
-
-// 		//输出
-// 		printf("距离： %.2lf\n", abs(distance.at<double>(2)));
-// 		//printf("角度： theta_x:%.4lf ,theta_y:%.4lf ,theta_z:%.4lf\n", theta_x, theta_y, theta_z);
-// 		//printf("angle_x:%.4lf ,angle_y:%.4lf\n", angle_x,angle_y);
-
-
-
-// }
+		//输出
+		printf("距离： %.2lf\n", abs(distance.at<double>(2)));
+		//printf("角度： theta_x:%.4lf ,theta_y:%.4lf ,theta_z:%.4lf\n", theta_x, theta_y, theta_z);
+		//printf("angle_x:%.4lf ,angle_y:%.4lf\n", angle_x,angle_y);
+}
