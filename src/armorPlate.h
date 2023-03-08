@@ -49,7 +49,7 @@ public:
 	double distance;
 	double speed;
 	double acceleration;
-	
+
 
 };
 
